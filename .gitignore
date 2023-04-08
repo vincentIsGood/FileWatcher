@@ -3,7 +3,6 @@
 .testcerts
 0_*
 
-out/
 classes/com
 logs/
 lib/*sources.jar
