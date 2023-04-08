@@ -1,0 +1,18 @@
+.idea
+.vscode
+.testcerts
+0_*
+
+classes/com
+logs/
+lib/*sources.jar
+lib/com
+lib/org
+
+# DEV*
+/*.jar
+/*.txt
+*.jks
+*.pfx
+*.cer
+*.zip
