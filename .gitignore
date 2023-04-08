@@ -10,7 +10,7 @@ lib/*sources.jar
 lib/com
 lib/org
 
-# DEV*
+DEV*
 /*.jar
 /*.txt
 *.jks
