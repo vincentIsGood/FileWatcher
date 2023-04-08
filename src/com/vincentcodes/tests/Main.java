@@ -15,10 +15,15 @@ public class Main {
         FileWatcher fileWatcher = new FileWatcher("./");
         fileWatcher.registerListener((OnFileModified) fileChanged -> System.out.println("Dir: " + fileChanged.toAbsolutePath()));
 
-        class ReadmeWatcher implements OnFileCreated, SpecificFileListener {
+        class ReadmeWatcher implements OnFileCreated, OnFileModified, SpecificFileListener {
             @Override
             public void handleOnFileCreated(Path fileChanged) {
-                System.out.println("Specific: " + fileChanged.toAbsolutePath());
+                System.out.println("Specific (created): " + fileChanged.toAbsolutePath());
+            }
+
+            @Override
+            public void handleOnFileModified(Path fileChanged) {
+                System.out.println("Specific (modified): " + fileChanged.toAbsolutePath());
             }
 
             @Override
