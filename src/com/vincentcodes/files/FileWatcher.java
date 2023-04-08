@@ -2,7 +2,12 @@ package com.vincentcodes.files;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.*;
+import java.nio.file.FileSystems;
+import java.nio.file.Path;
+import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -12,7 +17,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
- * A high level wrapper for the WatchService API.
+ * A high level wrapper for the WatchService API
  * <p>
  * A better implementation with similar functionality 
  * can be found in Apache Commons-IO.
@@ -26,7 +31,7 @@ public class FileWatcher {
         CREATED, DELETED, MODIFIED
     }
 
-    private final Path directoryPath;
+    private final List<WatchKey> registeredDirectories;
     private final WatchService dirWatcher;
     private final ExecutorService executorService;
 
@@ -34,17 +39,23 @@ public class FileWatcher {
 
     private boolean shutdownRequested = false;
 
+    /**
+     * At least one directory is needed
+     * @param directory a directory to be watched
+     */
     public FileWatcher(String directory) throws IOException {
         this(new File(directory));
     }
 
+    /**
+     * At least one directory is needed
+     * @param directory a directory to be watched
+     */
     public FileWatcher(File directory) throws IOException{
+        registeredDirectories = new ArrayList<>();
+
         dirWatcher = FileSystems.getDefault().newWatchService();
-        directoryPath = Paths.get(directory.toURI());
-        directoryPath.register(dirWatcher, 
-            StandardWatchEventKinds.ENTRY_CREATE, 
-            StandardWatchEventKinds.ENTRY_DELETE, 
-            StandardWatchEventKinds.ENTRY_MODIFY);
+        addDirToWatchList(directory);
 
         executorService = Executors.newSingleThreadExecutor(runnable -> {
             Thread thread = new Thread(null, runnable, "FileWatcher", 0, false);
@@ -58,12 +69,44 @@ public class FileWatcher {
         listeners.put(FileEventTypes.MODIFIED, new ArrayList<>());
     }
 
-    public Path getDirectoryPath(){
-        return directoryPath;
+    /**
+     * Watch an additional directory
+     * @return successful or not
+     */
+    public boolean addDirToWatchList(File directory){
+        if(!directory.isDirectory())
+            return false;
+        try {
+            Path directoryPath = directory.getCanonicalFile().toPath();
+            WatchKey key = directoryPath.register(dirWatcher, 
+                StandardWatchEventKinds.ENTRY_CREATE, 
+                StandardWatchEventKinds.ENTRY_DELETE, 
+                StandardWatchEventKinds.ENTRY_MODIFY);
+            registeredDirectories.add(key);
+        } catch (IOException e) {
+            return false;
+        }
+        return true;
+    }
+    public void addDirsToWatchList(List<File> directories){
+        directories.forEach(this::addDirToWatchList);
     }
 
     /**
-     * Register a listener to allow it to listen for events you want it to
+     * <p>
+     * To turn {@link WatchKey} back to {@link Path}, you are required
+     * to cast a {@link WatchKey#watchable()} object back to path like 
+     * this {@code (Path) key.watchable()}.
+     * <p>
+     * To unregister a directory, do {@link WatchKey#cancel()}
+     * @return a list of watch keys registered to the watch service
+     */
+    public List<WatchKey> getRegisteredDirectories(){
+        return registeredDirectories;
+    }
+
+    /**
+     * Register a listener to allow it to listen for file events
      * @param listener an object that implements one or a maximum of 3
      *                 interfaces listed below
      * @see OnFileCreated
@@ -123,7 +166,8 @@ public class FileWatcher {
                     if(event.kind() == StandardWatchEventKinds.OVERFLOW)
                         continue;
 
-                    Path fileChanged = (Path)event.context();
+                    Path directory = (Path) key.watchable();
+                    Path fileChanged = directory.resolve((Path)event.context());
                     if(event.kind() == StandardWatchEventKinds.ENTRY_CREATE)
                         dispatchEventToListeners(FileEventTypes.CREATED, fileChanged);
                     else if(event.kind() == StandardWatchEventKinds.ENTRY_DELETE)
